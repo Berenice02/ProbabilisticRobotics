@@ -33,5 +33,4 @@ codegen/
 # Simulink cache files
 *.slxc
 
-data/
 tools/
