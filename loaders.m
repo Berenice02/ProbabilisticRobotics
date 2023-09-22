@@ -83,9 +83,10 @@ function traj = loadTrajectory()
     # TODO
     # Those are the same as the ones from measurement files
     T=load("data/trajectoy.dat");
-    traj.pose_id = T(:, 1);
-    traj.odom_poses = T(:, 2:4);
-    traj.gt_poses = T(:, 5:7);
+    % traj.pose_id = T(:, 1);
+    % traj.odom_poses = T(:, 2:4);
+    % traj.gt_poses = T(:, 5:7);
+    traj = T;
 end
 
 
@@ -107,6 +108,11 @@ function [seq, gt_pose, odom_pose, points] = loadMeasFile(filepath)
     % Open the file
 	fid = fopen(filepath, 'r');
 
+    if fid == -1
+        disp(['Error in reading file ', filepath]);
+        return
+    end
+
     points = [];
     while true
 		% Get current line
@@ -114,6 +120,7 @@ function [seq, gt_pose, odom_pose, points] = loadMeasFile(filepath)
 
 		% Stop if EOF
 		if c_line == -1
+            fclose(fid);
 			break;
 		end
 
