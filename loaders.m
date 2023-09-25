@@ -97,6 +97,7 @@ function [gt_poses, odom_poses, observations] = loadMeasurements()
         [seq, gt_pose, odom_pose, points] = loadMeasFile(filepath);
         gt_poses(seq+1, :) = gt_pose;
         odom_poses(seq+1, :) = odom_pose;
+        # Potrei inizializzarlo a 133 e fare un tensore 4x133x200
         observations(seq+1, 1).obs = points(:,:);
     end
 end
@@ -159,12 +160,12 @@ end
 function out = extractPoint(elements)
     meas_id = str2double(elements{2});
     gt_id = str2double(elements{3});
-    x_p = str2double(elements{4});
-    y_p = str2double(elements{5});
+    col_p = str2double(elements{4});
+    row_p = str2double(elements{5});
     # POINT_ID_CURRENT_MESUREMENT
     out.meas_id = meas_id;
     # ACTUAL_POINT_ID
     out.gt_id = gt_id;
     # IMAGE_POINT
-    out.image_point = [x_p, y_p];
+    out.image_point = [col_p, row_p];
 end
