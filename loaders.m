@@ -44,10 +44,10 @@ function camera_infos = loadCameraInfos()
         switch(elements{1})
             case 'camera'
                 if strcmp (elements{2}, 'matrix:')
-                    camera_infos.cm = extractMatrices(fid, 3);
+                    camera_infos.K = extractMatrices(fid, 3);
                 end
             case 'cam_transform:'
-                camera_infos.cam_transform = extractMatrices(fid, 4);
+                camera_infos.T = extractMatrices(fid, 4);
             case 'z_near:'
                 camera_infos.z_near = elements{2};
             case 'z_far:'
