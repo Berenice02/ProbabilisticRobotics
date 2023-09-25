@@ -1,12 +1,13 @@
+1;
 % The following functions are based on the loadG2o function, developed for
 % the lectures of probabilistic robotics at Sapienza, University of Rome.
 % Copyright (c) 2016 Bartolomeo Della Corte, Giorgio Grisetti
 
-function [world_landmark, camera_infos, traj, gt_poses, odom_poses, observations] = loaders()
+function [world_landmark, camera_infos, traj, gt_poses, odom_poses, observations] = load_all(num_poses)
     world_landmark = loadWorld();
     camera_infos = loadCameraInfos();
     traj = loadTrajectory();
-    [gt_poses, odom_poses, observations] = loadMeasurements();
+    [gt_poses, odom_poses, observations] = loadMeasurements(num_poses);
 end
 
 % world.dat contains information about the map
@@ -91,8 +92,8 @@ end
 
 
 % meas-XXXXX.dat contains information about the XXXXX measurement
-function [gt_poses, odom_poses, observations] = loadMeasurements()
-    for i = 1:200
+function [gt_poses, odom_poses, observations] = loadMeasurements(num_poses)
+    for i = 1:num_poses
         filepath = ["data/meas-00", num2str(i-1, '%03.f'), ".dat"];
         [seq, gt_pose, odom_pose, points] = loadMeasFile(filepath);
         gt_poses(seq+1, :) = gt_pose;
