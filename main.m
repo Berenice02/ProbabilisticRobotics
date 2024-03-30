@@ -1,5 +1,5 @@
 close all
-clear
+clear all
 clc
 
 #import utils
@@ -8,13 +8,26 @@ source "./utils.m"
 source "./visualisers.m"
 source "./camera_utils.m"
 
-[world_landmark, camera_infos, traj, gt_poses, odom_poses, observations] = loaders();
+num_poses = 200;
+num_landmarks = 1000;
 
-# Those are the same
+[world_landmarks, camera_infos, traj, observations] = load_all(num_poses, num_landmarks);
+odom_poses = traj(:, 1:3);
+
+format long
 % plot_odom_gt_trajectories_from_traj(traj);
-% plot_odom_gt_trajectories_from_poses(gt_poses, odom_poses);
 
-traj = compute_odometry_trajectory(gt_poses(1:9, :));
-robot_pose = from_2d_to_3d(traj(9,:));
-dove_sta_nella_mappa = [6.80375; -2.11234;   1.1324];
-p_img = project_point(camera_infos, dove_sta_nella_mappa, robot_pose)
+% The state is composed by:
+% - N robot poses, each as an array of 3x3 homogeneous transform matrices
+% - M landmark positions, each as a 3x1 array
+% XR=zeros(3, 3, num_poses);
+% XL=zeros(3, num_landmarks);
+
+% # Initialization
+% XR(:, :, 1) = eye(3);
+% for i = 2:num_poses
+%     odom_T = v2t(odom_poses(i-1, :)');
+%     XR(:, :, i) = XR(:, :, i-1) * odom_T;
+% end
+
+% landmark_associations=zeros(2,num_landmarks);
