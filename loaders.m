@@ -57,13 +57,13 @@ function camera_infos = loadCameraInfos()
             case 'cam_transform'
                 camera_infos.T = extractMatrix(fid, 4);
             case 'z_near'
-                camera_infos.z_near = elements{2};
+                camera_infos.z_near = str2double(elements{2});
             case 'z_far'
-                camera_infos.z_far = elements{2};
+                camera_infos.z_far = str2double(elements{2});
             case 'width'
-                camera_infos.width = elements{2};
+                camera_infos.width = str2double(elements{2});
             case 'height'
-                camera_infos.height = elements{2};
+                camera_infos.height = str2double(elements{2});
             otherwise
                 if not(strcmp(elements{1}, ""))
                     disp(['Error in reading element ', elements{1}, ...
