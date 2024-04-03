@@ -51,8 +51,7 @@ endfunction
 % Custom
 #from 3d vector on 2d to homogeneous matrix on 3d
 function T = from_3dv_to_3dt(v)
-	v = [v(1:2)'; 0; 0; 0; v(3)];
-  T = eye(4);
-  T(1:3,1:3) = Rz(v(3));
-	T(1:3,4)=[v(1:2); 0];
+	T = eye(4);
+	T(1:3,1:3) = Rz(v(3));
+	T(1:3,4)=[v(1:2)'; 0];
 end

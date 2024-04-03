@@ -8,9 +8,12 @@
 %% robot_pose:   is a 3x3 transform matrix representing the pose of the robot
 %%
 %% p_img:        is a 2x1 vector containg the [col;row] of the point in the image
-function p_img = project_point(camera_infos, point, robot_pose)
+%% visible:      is a boolean that expresses if the point is projected (is visible) into
+%%               the image from the specific robot pose
+function [p_img, visible] = project_point(camera_infos, point, robot_pose)
     % Initialization as an out-of-image point
     p_img = [-1; -1];
+    visible = true;
 
     % World to camera transform
     world_to_camera = robot_pose*camera_infos.T;
@@ -20,6 +23,7 @@ function p_img = project_point(camera_infos, point, robot_pose)
     % Ignore it if it's too close or too far
     if ( point_in_camera(3) < camera_infos.z_near ||
          point_in_camera(3) > camera_infos.z_far )
+        visible = false;
         return;
     end
 
@@ -30,6 +34,7 @@ function p_img = project_point(camera_infos, point, robot_pose)
     % Ignore it if it's outside the image boundaries
     if ( p_img(1) < 0 || p_img(1) > camera_infos.width ||
          p_img(2) < 0 || p_img(2) > camera_infos.height )
+        visible = false;
         return;
     end
 end
