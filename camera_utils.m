@@ -56,21 +56,3 @@ function [p_img, visible] = project_point(p_cam)
         visible = false;
     end
 end
-
-% It derives the T matrix and o vector to find the 3D position of a point
-% given one of its normalized image coordinates
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% robot_pose:   is a 3x3 transform matrix representing the pose of the robot
-%% p_img:        is a 2x1 vector containg the [col;row] of the point in the image
-%%
-%% [T, o]:       T * p = o
-function [T, o] = get_triangulation_equations(robot_pose, p_img)
-    w2c = world_to_camera(robot_pose);
-
-    T = [w2c(1, 1:3) - p_img(1) * w2c(3, 1:3);
-         w2c(2, 1:3) - p_img(2) * w2c(3, 1:3)];
-
-    o = [w2c(1, 4) - w2c(3, 4) * p_img(1);
-         w2c(2, 4) - w2c(3, 4) * p_img(2)];
-end
-
