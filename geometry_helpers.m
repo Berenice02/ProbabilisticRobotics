@@ -55,3 +55,17 @@ function T = from_3dv_to_3dt(v)
 	T(1:3,1:3) = Rz(v(3));
 	T(1:3,4)=[v(1:2)'; 0];
 end
+
+#from homogeneous matrix on 2d to homogeneous matrix on 3d
+function T = from_2dt_to_3dt(T2)
+	T = eye(4);
+	T(1:2,1:2) = T2(1:2,1:2);
+	T(1:2,4) = T2(1:2,3);
+end
+
+#from homogeneous matrix on 3d to homogeneous matrix on 2d
+function T = from_3dt_to_2dt(T3)
+	T = eye(3);
+	T(1:2,1:2) = T3(1:2,1:2);
+	T(1:2,3) = T3(1:2,4);
+end
