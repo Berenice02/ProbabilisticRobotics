@@ -3,11 +3,11 @@
 % the lectures of probabilistic robotics at Sapienza, University of Rome.
 % Copyright (c) 2016 Bartolomeo Della Corte, Giorgio Grisetti
 
-function [world_landmarks, camera_infos, traj, observations] = load_all(num_poses, num_landmarks)
+function [world_landmarks, camera_infos, traj, observations, landmark_associations] = load_all(num_poses, num_landmarks)
     world_landmarks = loadWorld(num_landmarks);
     camera_infos = loadCameraInfos();
     traj = loadTrajectories(num_poses);
-    observations = loadMeasurements(num_poses);
+    [observations, landmark_associations] = loadMeasurements(num_poses, num_landmarks);
 end
 
 % world.dat contains information about the map
@@ -104,16 +104,31 @@ end
 
 % meas-XXXXX.dat contains information about the XXXXX measurement
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% observations is a num_poses x 1 cell array
-%% each cell contains a n x 3 array of observations with n variable
-%% the ID of the pose is (row_index - 1)
-function observations = loadMeasurements(num_poses)
-    observations = cell(num_poses, 1);
+%% observations is a 2 x num_measurements array
+%%      num_measurements is AT MOST num_poses * num_landmarks
+%%      each column contains the 2 x 1 observation
+%% landmark_associations is a 2 x num_measurements array
+%%      each column contains the vector [ID of the pose; ID of the landmark]
+function [observations, landmark_associations] = loadMeasurements(num_poses, num_landmarks)
+    num_measurements = num_poses * num_landmarks;
+    observations = zeros(2, num_measurements);
+    landmark_associations = zeros(2, num_measurements);
+
+    last_m = 0;
     for i = 1:num_poses
         filepath = ["data/meas-", num2str(i-1, '%05.f'), ".dat"];
-        points = loadMeasFile(filepath);
-        observations{i} = points(:,:);
+        [m, landmark_ids, points] = loadMeasFile(filepath, num_landmarks);
+        m += last_m;
+        observations(:, last_m+1:m) = points(:,:);
+        landmark_associations(1, last_m+1:m) = (i-1) * ones(1, m-last_m);
+        landmark_associations(2, last_m+1:m) = landmark_ids(:,:);
+        last_m = m;
     end
+
+    last_m -= 1;
+    observations = observations(:, 1:m);
+    landmark_associations = landmark_associations(:, 1:m);
+
 end
 
 % Every measurement contains a sequence number
@@ -122,10 +137,14 @@ end
 %  point POINT_ID_CURRENT_MESUREMENT (1) ACTUAL_POINT_ID (2) IMAGE_POINT (3:4)
 % The Image_Point represents the pair [col;row] where the landmark is observed in the image
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% points is a n x 3 array with n = the actual number of measurements
-%% each row contains [point_id col_of_image_point row_of_image_point]
-%% the ID of the measurement is (row_index - 1)
-function points = loadMeasFile(filepath)
+%% m is a scalar containing the actual number of measurements in the file
+%% landmark_ids is a 1 x m array containing the actual_point_id for each measurement
+%% points is a 2 x m array containing [col_of_image_point; row_of_image_point]
+function [m, landmark_ids, points] = loadMeasFile(filepath, num_landmarks)
+    m = 1;
+    landmark_ids = zeros(1, num_landmarks);
+    points = zeros(2, num_landmarks);
+
     % Open the file
 	fid = fopen(filepath, 'r');
 
@@ -134,7 +153,6 @@ function points = loadMeasFile(filepath)
         return
     end
 
-    points = [];
     while true
 		% Get current line
 		c_line = fgetl(fid);
@@ -153,7 +171,9 @@ function points = loadMeasFile(filepath)
         switch(elements{1})
             case 'point'
                 p = arrayfun(@(x) str2double(x), elements)(3:5);
-                points = [points; p];
+                landmark_ids(m) = p(1);
+                points(:, m) = p(2:3);
+                m += 1;
             case {'seq:', 'gt_pose:', 'odom_pose:'}
                 % does nothing
             otherwise
@@ -164,4 +184,8 @@ function points = loadMeasFile(filepath)
                 continue;
         end
     end
+
+    m = m-1;
+    landmark_ids = landmark_ids(:, 1:m);
+    points = points(:, 1:m);
 end

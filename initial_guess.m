@@ -1,86 +1,80 @@
 source "./camera_utils.m"
 
 % It returns a vector containing an initial guess on the position of the landmarks
+% In particular, it explore measurements to gather triangulation equations
+% coming from observing the same landmark from different poses and then solves
+% the linear system
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% mode:        it is a string that represent the type of weight used to
-%%              compensate for the cumulative error of the pose
-%%              possible values are: ['no_weight', 'linear', 'hyperbola', 'log']
+%% robot_poses:           it is a 3 x num_poses array
+%% observations:          it is a 2 x num_measurements array
+%%                        num_measurements is AT MOST num_poses * num_landmarks
+%% landmark_associations: it is a 2 x num_measurements array
+%%                        each column contains the vector [ID of the pose; ID of the landmark]
+%% mode:                  it is a string that represent the type of weight used to
+%%                        compensate for the cumulative error of the pose
+%%                        possible values are: ['no_weight', 'linear', 'hyperbola', 'log']
 %%
-%% landmarks:   is a num_landmarks x 3 array
-%%              each row contains a 3D_position
-function landmarks = get_initial_guess(mode='log')
+%% landmarks:   is a 3 x num_landmarks array; each column contains a 3D_position
+%%              [-1; -1; -1] if no initial guess
+function landmarks = get_initial_guess(robot_poses, observations, landmark_associations, mode='no_weight')
+    global num_poses num_landmarks;
+    landmarks = ones(3, num_landmarks)*(-1);
 
-    [As, bs, Ws] = explore_measurements();
-    landmarks = solve_system(As, bs, Ws, mode=mode);
-end
+    for i = 1:num_landmarks
+        ob_indeces = find(landmark_associations(2, :)==i-1);
+        num_measurements = length(ob_indeces);
+        if num_measurements < 2
+            continue;
+        end
+        As = zeros(num_measurements*2, 3);
+        bs = zeros(num_measurements*2, 1);
+        ob = observations(:, ob_indeces);
+        Ws = landmark_associations(1, ob_indeces);
 
-% Explore measurements to gather triangulation equations.
-% In particular, for each landmark, stack together all the triangulation
-% equations coming from observing the same landmark from different poses
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% [As, bs, Ws]: As * p = bs
-%% As:          Cell array containing triangulation matrices for each landmark
-%% bs:          Cell array containing triangulation vectors for each landmark
-%% Ws:          Cell array containing weight vector for each landmark
-function [As, bs, Ws] = explore_measurements()
-    global num_poses num_landmarks traj observations;
-
-    As = cell(num_landmarks, 1);
-    bs = cell(num_landmarks, 1);
-    Ws = cell(num_landmarks, 1);
-
-    for i = 1:num_poses
-        robot_pose = from_3dv_to_3dt(traj(i, 1:3));
-        ob = observations{i};
-        for j=1:length(ob)
-            l_id = ob(j, 1);
-            z = ob(j, 2:3)';
+        for j=1:num_measurements
+            pose_index = Ws(j);
+            robot_pose = from_3dv_to_3dt((robot_poses(:, pose_index+1))');
+            z = ob(:, j);
             [A, b] = get_triangulation_equations(robot_pose, z);
 
-            As{l_id+1} = [As{l_id+1}; A];
-            bs{l_id+1} = [bs{l_id+1}; b];
-            Ws{l_id+1} = [Ws{l_id+1}; i; i];
+            start_index = j*2-1;
+            As(start_index:start_index+1, :) = A(:, :);
+            bs(start_index:start_index+1, :) = b(:, :);
         end
-    end
 
+        landmarks(:, i) = solve_system(As, bs, Ws, mode=mode);
+    end
 end
 
 % Solves a system of equations to return the triangulated 3D positions for all points
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% As:          Cell array containing triangulation matrices for each landmark
-%% bs:          Cell array containing triangulation vectors for each landmark
-%% Ws:          Cell array containing weight vector for each landmark
+%% As:          num_measurements*2 x 3 array containing triangulation matrices of each measurement
+%% bs:          num_measurements*2 x 1 array containing triangulation vectors of each measurement
+%% Ws:          num_measurements x 1 array containing pose_id of each measurement
 %% mode:        it is a string that represent the type of weight used to
 %%              compensate for the cumulative error of the pose
 %%              possible values are: ['no_weight', 'linear', 'hyperbola', 'log']
 %%
-%% points:      is a num_landmarks x 3 array
-%%              each row contains the triangulated 3D_position of the landmark
-function points = solve_system(As, bs, Ws, mode=mode)
-    global num_poses num_landmarks;
-    points = ones(3, num_landmarks)*(-1);
-
-    for i = 1:num_landmarks
-        % if we have at least two correspondances we can triangulate
-        if (length(bs{i}) > 2)
-            switch mode
-                case 'no_weight'
-                    w = ones(1, length(Ws{i}));
-                case 'linear'
-                    w = 1 - num_poses+1 ./ Ws{i};
-                case 'hyperbola'
-                    w = 1 ./ Ws{i};
-                case 'log'
-                    w = 1 - (log(Ws{i}) ./ log(num_poses+1));
-                otherwise
-                    w = 1 - (log(Ws{i}) ./ log(num_poses+1));
-            end
-            
-            % x = lscov(A,b,w) returns x that minimizes r'*diag(w)*r, where r = b - A*x.
-            points(:, i) = lscov(As{i}, -bs{i}, w);
-            %points{i} = -As{i}\(bs{i});
-        end
+%% point:      is the triangulated 3D_position of the landmark
+function point = solve_system(As, bs, Ws, mode=mode)
+    global num_poses;
+    switch mode
+        case 'no_weight'
+            w = ones(1, length(Ws));
+        case 'linear'
+            w = (num_poses+1) ./ Ws;
+        case 'hyperbola'
+            w = 1 ./ Ws;
+        case 'log'
+            w = 1 - (log(Ws+1) ./ log(num_poses+1));
+        otherwise
+            w = ones(1, length(Ws));
     end
+    
+    w = repelem(w, 2);
+    % x = lscov(A,b,w) returns x that minimizes r'*diag(w)*r, where r = b - A*x.
+    point = lscov(As, -bs, w);
+    %point = -As\(bs);
 end
 
 % It derives the A matrix and b vector to find the 3D position of a point
