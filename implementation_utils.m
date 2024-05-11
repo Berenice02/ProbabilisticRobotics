@@ -12,8 +12,8 @@ source "./geometry_helpers.m"
 %%
 %% XR:  XR after applying the perturbation
 %% XL:  XL after applying the perturbation
-function [XR, XL]=boxPlus(XR, XL, dx)
-	global num_poses, num_landmarks;
+function [XR, XL] = boxPlus(XR, XL, dx)
+	global num_poses num_landmarks;
 	% Robot poses
 	for i=1:num_poses
 		index_of_perturbation = getPoseIndex(i);
@@ -24,7 +24,7 @@ function [XR, XL]=boxPlus(XR, XL, dx)
 	for i=1:num_landmarks
 		index_of_perturbation = getLandmarkIndex(i);
 		dxl = dx(index_of_perturbation:index_of_perturbation+2);
-		XL(:, :, i) += dxl;
+		XL(:, i) += dxl;
 	end
 end
 
@@ -34,7 +34,7 @@ end
 %%
 %% idx: the index of the pose
 function idx = getPoseIndex(pose_index)
-    global num_poses, num_landmarks;
+    global num_poses num_landmarks;
     idx = ((pose_index-1) * 3) + 1;
 end
 
@@ -44,7 +44,7 @@ end
 %%
 %% idx: the index of the landmark
 function idx = getLandmarkIndex(landmark_index)
-    global num_poses, num_landmarks;
+    global num_poses num_landmarks;
     idx = (num_poses * 3) + ((landmark_index - 1) * 3) + 1;
 end
 
@@ -57,7 +57,7 @@ end
 %% e:   is a 2x1 array representing the error, aka the difference between prediction and measurement
 %% Jr:  is a 2x3 derivative of the error wrt a perturbation of the pose
 %% Jl:  is a 2x3 derivative of the error wrt a perturbation of the landmark
-function [visible, e, Jr, Jl] = errorAndJacobian(XR, XL, z)
+function [visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z)
     global camera_infos;
 
 	e = zeros(2,1);
@@ -65,7 +65,7 @@ function [visible, e, Jr, Jl] = errorAndJacobian(XR, XL, z)
 	Jl = zeros(2,3);
 	visible = false;
 
-	[p_cam, visible] = point_in_camera(XL, XR);
+	[p_cam, visible] = point_in_camera(xl, xr);
 	if not(visible)
 		return;
 	end
@@ -82,9 +82,8 @@ function [visible, e, Jr, Jl] = errorAndJacobian(XR, XL, z)
 	J_proj = [z_inv	    0	    -p_cam(1) * z_inv_sq; 
               0	        z_inv	-p_cam(2) * z_inv_sq];
 
-	XR_4 = from_2dt_to_3dt(XR);
-	w2c = XR_4*camera_infos.T;
-	R_t = w2c(1:3,1:3)';
+	w2c = world_to_camera(xr, include_k=false);
+	R_t = w2c(1:3,1:3);
 
 	J_icp = zeros(3);
   	J_icp(1:3, 1:2) = -R_t(:, 1:2);
@@ -92,4 +91,53 @@ function [visible, e, Jr, Jl] = errorAndJacobian(XR, XL, z)
 
 	Jr = J_proj * camera_infos.K * J_icp;
 	Jl = J_proj * camera_infos.K * R_t;
+end
+
+%%
+function [chi_tot, XR, XL] = doLS(XR, XL, observations, landmark_associations)
+	global num_poses num_landmarks;
+
+	% size of the system
+	system_size = 3 * num_poses + 3 * num_landmarks;
+	H = zeros(system_size);
+    b = zeros(system_size, 1);
+	chi_tot = 0;
+	
+	for i = 1:length(observations)
+		pose_id = landmark_associations(1, i);
+		landmark_id = landmark_associations(2, i);
+
+		z = observations(:, i);
+
+		xr = XR(:, :, pose_id+1);
+		xl = XL(:, landmark_id+1);
+
+		[visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z);
+
+		if not(visible)
+			continue;
+		end
+
+		chi = e'*e;
+		chi_tot += chi;
+
+		pose_index = getPoseIndex(pose_id+1);
+		landmark_index = getLandmarkIndex(landmark_id+1);
+
+		H(pose_index:pose_index+2, pose_index:pose_index+2) += Jr'*Jr;
+
+		H(pose_index:pose_index+2, landmark_index:landmark_index+2) += Jr'*Jl;
+		H(landmark_index:landmark_index+2, pose_index:pose_index+2) += Jl'*Jr;
+
+		H(landmark_index:landmark_index+2,	landmark_index:landmark_index+2) += Jl'*Jl;
+
+		b(pose_index:pose_index+2) += Jr'*e;
+		b(landmark_index:landmark_index+2) += Jl'*e;
+	end
+
+	dx=zeros(system_size, 1);
+
+	dx = -H\b;
+	% dx(4:end) = -H(4:end, 4:end)\b(4:end, 1);
+	[XR, XL] = boxPlus(XR, XL, dx);
 end

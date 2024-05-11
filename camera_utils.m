@@ -5,13 +5,18 @@
 %% robot_pose:   is a 3x3 transform matrix representing the pose of the robot
 %%
 %% w2c:          is a 4x4 transform matrix representing the world to camera transformation
-function w2c = world_to_camera(robot_pose)
+function w2c = world_to_camera(robot_pose, include_k=true)
     global camera_infos;
-    k = eye(4);
-    k(1:3, 1:3) = camera_infos.K;
+    robot_pose_4 = from_2dt_to_3dt(robot_pose);
+    w2c = robot_pose_4*camera_infos.T;
 
-    w2c = inv(robot_pose*camera_infos.T);
-    w2c = k*w2c;
+    if include_k
+        k = eye(4);
+        k(1:3, 1:3) = camera_infos.K;
+        w2c = k/w2c;
+    else
+        w2c = inv(w2c);
+    end
 end
 
 % get the position of the point wrt camera
