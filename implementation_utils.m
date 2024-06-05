@@ -87,14 +87,14 @@ function [visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z)
 
 	J_icp = zeros(3);
   	J_icp(1:3, 1:2) = -R_t(:, 1:2);
-    J_icp(1:3, 3) = R_t * [p_cam(2); -p_cam(1); 0];
+	J_icp(1:3, 3) = R_t * [xl(2); -xl(1); 0];
 
 	Jr = J_proj * camera_infos.K * J_icp;
 	Jl = J_proj * camera_infos.K * R_t;
 end
 
 %%
-function [chi_tot, XR, XL] = doLS(XR, XL, observations, landmark_associations)
+function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, kernel_threshold, damping)
 	global num_poses num_landmarks;
 
 	% size of the system
@@ -102,6 +102,7 @@ function [chi_tot, XR, XL] = doLS(XR, XL, observations, landmark_associations)
 	H = zeros(system_size);
     b = zeros(system_size, 1);
 	chi_tot = 0;
+	num_inliers = 0;
 	
 	for i = 1:length(observations)
 		pose_id = landmark_associations(1, i);
@@ -118,7 +119,14 @@ function [chi_tot, XR, XL] = doLS(XR, XL, observations, landmark_associations)
 			continue;
 		end
 
-		chi = e'*e;
+		chi = e' *e ;
+		if (chi>kernel_threshold)
+			e *= sqrt(kernel_threshold/chi);
+			chi_tot += kernel_threshold;
+			continue;
+		else
+			num_inliers += 1;
+		end
 		chi_tot += chi;
 
 		pose_index = getPoseIndex(pose_id+1);
@@ -135,9 +143,9 @@ function [chi_tot, XR, XL] = doLS(XR, XL, observations, landmark_associations)
 		b(landmark_index:landmark_index+2) += Jl'*e;
 	end
 
-	dx=zeros(system_size, 1);
+	dx = zeros(system_size, 1);
 
-	dx = -H\b;
-	% dx(4:end) = -H(4:end, 4:end)\b(4:end, 1);
+	% dx = -H\b;
+	dx(4:end) = -H(4:end, 4:end)\b(4:end, 1);
 	[XR, XL] = boxPlus(XR, XL, dx);
 end
