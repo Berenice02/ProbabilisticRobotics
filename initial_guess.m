@@ -18,7 +18,7 @@ source "./camera_utils.m"
 %%              [-1; -1; -1] if no initial guess
 function landmarks = get_initial_guess(robot_poses, observations, landmark_associations, mode='no_weight')
     global num_poses num_landmarks;
-    landmarks = ones(3, num_landmarks)*(-1);
+    landmarks = zeros(3, num_landmarks);
 
     for i = 1:num_landmarks
         ob_indeces = find(landmark_associations(2, :)==i-1);
@@ -32,17 +32,20 @@ function landmarks = get_initial_guess(robot_poses, observations, landmark_assoc
         Ws = landmark_associations(1, ob_indeces);
 
         for j=1:num_measurements
-            pose_index = Ws(j);
-            robot_pose = from_3dv_to_3dt((robot_poses(:, pose_index+1))');
+            pose_id = Ws(j);
+            robot_pose = v2t((robot_poses(:, pose_id+1))');
             z = ob(:, j);
             [A, b] = get_triangulation_equations(robot_pose, z);
+            % [A, b] = get_triangulation_equations_alternative(robot_pose, z);
 
             start_index = j*2-1;
             As(start_index:start_index+1, :) = A(:, :);
             bs(start_index:start_index+1, :) = b(:, :);
         end
 
-        landmarks(:, i) = solve_system(As, bs, Ws, mode=mode);
+        point = solve_system(As, bs, Ws, mode=mode);
+        % point = solve_system_alternatives(As, bs, Ws, mode=mode);
+        landmarks(:, i) = point(1:3);
     end
 end
 
@@ -74,8 +77,25 @@ function point = solve_system(As, bs, Ws, mode=mode)
     w = repelem(w, 2);
     % x = lscov(A,b,w) returns x that minimizes r'*diag(w)*r, where r = b - A*x.
     point = lscov(As, -bs, w);
-    %point = -As\(bs);
+    % point = -As\(bs);
 end
+
+function point = solve_system_alternatives(As, bs, Ws, mode=mode)
+    global num_poses;
+
+    [U, S, V] = svd(As, 'econ');
+    % bb = U'*bs;
+    % y = bb;
+    % for i=1:size(D,2)
+    %     y /= D(i,i);
+    % end
+    
+    % point = V * y;
+    
+    point = V(:, end);
+    % point = -As\(bs);
+end
+
 
 % It derives the A matrix and b vector to find the 3D position of a point
 % given one of its normalized image coordinates
@@ -94,4 +114,19 @@ function [A, b] = get_triangulation_equations(robot_pose, p_img)
 
     b = [w2c(1, 4) - w2c(3, 4) * p_img(1);
          w2c(2, 4) - w2c(3, 4) * p_img(2)];
+end
+
+function [A, b] = get_triangulation_equations_alternative(robot_pose, p_img)
+    global camera_infos;
+    w2c = world_to_camera(robot_pose);
+
+    r1 = w2c(1, :);
+    r2 = w2c(2, :);
+    r3 = w2c(3, :);
+
+
+    A = [p_img(1) * r3 - r1;
+         p_img(2) * r3 - r2];
+
+    b = zeros(2,1);
 end
