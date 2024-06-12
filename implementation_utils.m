@@ -82,7 +82,7 @@ function [visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z)
 	J_proj = [z_inv	    0	    -p_cam(1) * z_inv_sq; 
               0	        z_inv	-p_cam(2) * z_inv_sq];
 
-	w2c = world_to_camera(xr, include_k=false);
+	w2c = world_to_camera(xr);
 	R_t = w2c(1:3,1:3);
 
 	J_icp = zeros(3);

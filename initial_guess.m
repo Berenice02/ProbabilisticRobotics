@@ -107,22 +107,22 @@ end
 %% A:            a 2x3 matrix
 %% b:            a 2x1 vector 
 function [A, b] = get_triangulation_equations(robot_pose, p_img)
-    w2c = world_to_camera(robot_pose);
+    w2i = world_to_image(robot_pose);
 
-    A = [w2c(1, 1:3) - p_img(1) * w2c(3, 1:3);
-         w2c(2, 1:3) - p_img(2) * w2c(3, 1:3)];
+    A = [w2i(1, 1:3) - p_img(1) * w2i(3, 1:3);
+         w2i(2, 1:3) - p_img(2) * w2i(3, 1:3)];
 
-    b = [w2c(1, 4) - w2c(3, 4) * p_img(1);
-         w2c(2, 4) - w2c(3, 4) * p_img(2)];
+    b = [w2i(1, 4) - w2i(3, 4) * p_img(1);
+         w2i(2, 4) - w2i(3, 4) * p_img(2)];
 end
 
 function [A, b] = get_triangulation_equations_alternative(robot_pose, p_img)
     global camera_infos;
-    w2c = world_to_camera(robot_pose);
+    w2i = world_to_image(robot_pose);
 
-    r1 = w2c(1, :);
-    r2 = w2c(2, :);
-    r3 = w2c(3, :);
+    r1 = w2i(1, :);
+    r2 = w2i(2, :);
+    r3 = w2i(3, :);
 
 
     A = [p_img(1) * r3 - r1;

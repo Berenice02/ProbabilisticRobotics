@@ -5,18 +5,29 @@
 %% robot_pose:   is a 3x3 transform matrix representing the pose of the robot
 %%
 %% w2c:          is a 4x4 transform matrix representing the world to camera transformation
-function w2c = world_to_camera(robot_pose, include_k=true)
+function w2c = world_to_camera(robot_pose)
     global camera_infos;
-    robot_pose_4 = from_2dt_to_3dt(robot_pose);
-    w2c = robot_pose_4*camera_infos.T;
+    w2c = eye(4);
 
-    if include_k
-        k = eye(4);
-        k(1:3, 1:3) = camera_infos.K;
-        w2c = k/w2c;
-    else
-        w2c = inv(w2c);
-    end
+    robot_pose_4 = from_2dt_to_3dt(robot_pose);
+    w2c = inv(robot_pose_4*camera_infos.T);
+end
+
+% get the world to image transformation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% robot_pose:   is a 3x3 transform matrix representing the pose of the robot
+%%
+%% w2i:          is a 4x4 transform matrix representing the world to image transformation
+%%               i.e. world to camera multiplied by camera matrix K
+function w2i = world_to_image(robot_pose)
+    global camera_infos;
+    
+    % Get the world to camera transformation
+    w2c = world_to_camera(robot_pose);
+
+    k = eye(4);
+    k(1:3, 1:3) = camera_infos.K;
+    w2i = k * w2c;
 end
 
 % get the position of the point wrt camera
@@ -30,10 +41,10 @@ function [p_cam, visible] = point_in_camera(point, robot_pose)
     global camera_infos;
     visible = true;
 
-    % Get the world to camera transformation
-    w2c = world_to_camera(robot_pose);
+    % Get the world to image transformation
+    w2i = world_to_image(robot_pose);
 
-    p_cam = w2c*[point;1];
+    p_cam = w2i*[point;1];
     p_cam = p_cam(1:3);
 
     % Ignore it if it's too close or too far
