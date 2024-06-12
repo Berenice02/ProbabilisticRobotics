@@ -93,16 +93,42 @@ function [visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z)
 	Jl = J_proj * camera_infos.K * R_t;
 end
 
+function [e, Ji, Jj]=poseErrorAndJacobian(xi, xj, z)
+	e = zeros(6,1);
+	Ji = zeros(6,3);
+	Jj = zeros(6,3);
+
+	g = inv(xi) * xj;
+	h = flatten(g);
+	z = flatten(z);
+
+	e = h-z;
+
+	Ri=xi(1:2,1:2);
+	Rj=xj(1:2,1:2);
+
+	Jj(5:6, 1) = Ri' * [1; 0];
+	Jj(5:6, 2) = Ri' * [0; 1];
+
+	Rz0=[0 -1;
+	     1  0];
+	Jtheta = Ri' * Rz0 * Rj;
+	Jj(1:4, 3) = reshape(Jtheta, 4, 1);
+	Jj(5:6, 3) = Ri' * Rz0 * xj(1:2, 3);
+
+	Ji=-Jj; 
+end
+
 %%
-function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, kernel_threshold, damping)
+function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, initial_odometry, kernel_threshold, damping)
 	global num_poses num_landmarks;
 
 	% size of the system
 	system_size = 3 * num_poses + 3 * num_landmarks;
 	H = zeros(system_size);
     b = zeros(system_size, 1);
-	chi_tot = 0;
-	num_inliers = 0;
+	chi_tot = zeros(2, 1);
+	num_inliers = zeros(2, 1);
 	
 	for i = 1:length(observations)
 		pose_id = landmark_associations(1, i);
@@ -113,21 +139,23 @@ function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landm
 		xr = XR(:, :, pose_id+1);
 		xl = XL(:, landmark_id+1);
 
+		% pose-landmark constraint
 		[visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z);
 
 		if not(visible)
 			continue;
 		end
 
-		chi = e' *e ;
+		chi = e' * e;
 		if (chi>kernel_threshold)
 			e *= sqrt(kernel_threshold/chi);
-			chi_tot += kernel_threshold;
-			continue;
+			chi = kernel_threshold;
+			% chi_tot += kernel_threshold;
+			% continue;
 		else
-			num_inliers += 1;
+			num_inliers(1) += 1;
 		end
-		chi_tot += chi;
+		chi_tot(1) += chi;
 
 		pose_index = getPoseIndex(pose_id+1);
 		landmark_index = getLandmarkIndex(landmark_id+1);
@@ -143,6 +171,40 @@ function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landm
 		b(landmark_index:landmark_index+2) += Jl'*e;
 	end
 
+	for i = 1:num_poses-1
+		% pose-pose constraint
+		xi = XR(:, :, i);
+		xj = XR(:, :, i+1);
+		z_ij = initial_odometry(:, :, i);
+		[e, Ji, Jj] = poseErrorAndJacobian(xi, xj, z_ij);
+
+		chi = e' * e;
+		if (chi>kernel_threshold)
+			e *= sqrt(kernel_threshold/chi);
+			chi = kernel_threshold;
+			% chi_tot += kernel_threshold;
+			% continue;
+		else
+			num_inliers(2) += 1;
+		end
+		chi_tot(2) += chi;
+
+		pose_i_index = getPoseIndex(i);
+		pose_j_index = getPoseIndex(i+1);
+
+		H(pose_i_index:pose_i_index+2, pose_i_index:pose_i_index+2) += Ji'*Ji;
+
+		H(pose_i_index:pose_i_index+2, pose_j_index:pose_j_index+2) += Ji'*Jj;
+		H(pose_j_index:pose_j_index+2, pose_i_index:pose_i_index+2) += Jj'*Ji;
+
+		H(pose_j_index:pose_j_index+2,	pose_j_index:pose_j_index+2) += Jj'*Jj;
+
+		b(pose_i_index:pose_i_index+2) += Ji'*e;
+		b(pose_j_index:pose_j_index+2) += Jj'*e;
+
+	end
+
+	%H += eye(system_size) * damping;
 	dx = zeros(system_size, 1);
 
 	% dx = -H\b;

@@ -69,3 +69,10 @@ function T = from_3dt_to_2dt(T3)
 	T(1:2,1:2) = T3(1:2,1:2);
 	T(1:2,3) = T3(1:2,4);
 end
+
+function flattened = flatten(X)
+	flattened = zeros(6, 1);
+	flattened(1:2) = X(1:2, 1);
+	flattened(3:4) = X(1:2, 2);
+	flattened(5:6) = X(1:2, 3);
+end
