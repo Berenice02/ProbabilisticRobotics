@@ -48,7 +48,7 @@ function idx = getLandmarkIndex(landmark_index)
     idx = (num_poses * 3) + ((landmark_index - 1) * 3) + 1;
 end
 
-% get error and Jacobian 
+% get error and Jacobian of landmarks projections
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% XR:  is a 3x3 transform matrix representing the robot pose in world frame
 %% XL:  is a 3x1 array representing the 3D position of the landmark in world frame
@@ -57,7 +57,7 @@ end
 %% e:   is a 2x1 array representing the error, aka the difference between prediction and measurement
 %% Jr:  is a 2x3 derivative of the error wrt a perturbation of the pose
 %% Jl:  is a 2x3 derivative of the error wrt a perturbation of the landmark
-function [visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z)
+function [visible, e, Jr, Jl] = errorAndJacobianLandmarkProjections(xr, xl, z)
     global camera_infos;
 
 	e = zeros(2,1);
@@ -93,34 +93,77 @@ function [visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z)
 	Jl = J_proj * camera_infos.K * R_t;
 end
 
-function [e, Ji, Jj]=poseErrorAndJacobian(xi, xj, z)
+function [e, Ji, Jj]=poseErrorAndJacobianAA(xi, xj, z)
 	e = zeros(6,1);
 	Ji = zeros(6,3);
 	Jj = zeros(6,3);
 
 	g = inv(xi) * xj;
-	h = flatten(g);
-	z = flatten(z);
-
-	e = h-z;
+	e = flatten(g-z);
 
 	Ri=xi(1:2,1:2);
 	Rj=xj(1:2,1:2);
 
-	Jj(5:6, 1) = Ri' * [1; 0];
-	Jj(5:6, 2) = Ri' * [0; 1];
+	% Jj(5:6, 1) = Ri' * [1; 0];
+	% Jj(5:6, 2) = Ri' * [0; 1];
 
-	Rz0=[0 -1;
-	     1  0];
-	Jtheta = Ri' * Rz0 * Rj;
-	Jj(1:4, 3) = reshape(Jtheta, 4, 1);
-	Jj(5:6, 3) = Ri' * Rz0 * xj(1:2, 3);
+	% Rz0=[0 -1;
+	%      1  0];
+	% Jtheta = Ri' * Rz0 * Rj;
+	% Jj(1:4, 3) = reshape(Jtheta, 4, 1);
+	% Jj(5:6, 3) = Ri' * Rz0 * xj(1:2, 3);
+
+	x1 = zeros(3,3);
+	x1(1,3) = -1;
+	x2 = zeros(3,3);
+	x2(2,3) = -1;
+	x3 = zeros(3,3);
+	x3(1,2) = 1;
+	x3(2,1) = -1;
+
+	dx = flatten(inv(xi) * x1* xj);
+	dy = flatten(inv(xi) * x2* xj);
+	dt = flatten(inv(xi) * x3* xj);
+
+	Jj = [dx dy dt];
+	Ji=-Jj; 
+end
+
+function [e, Ji, Jj]=poseErrorAndJacobian(xi, xj, z)
+	e = 0;
+	Ji = zeros(1,3);
+	Jj = zeros(1,3);
+
+	g = inv(xi) * xj;
+	h = norm(g(1:2, 3));
+	z = norm(z(1:2, 3));
+
+	e = h-z;
+
+	Ri=xi(1:2,1:2);
+
+	% Jj(1, 1) = norm(Ri' * [1; 0]);
+	% Jj(1, 2) = norm(Ri' * [0; 1]);
+
+	% Jj(1, 1) = 1;
+	% Jj(1, 2) = 1;
+	% Jj(1, 3) = [1 1] * xj(1:2, 3);
+
+	% Jj(1,1) = g(1, 3);
+	% Jj(1,2) = g(2, 3);
+
+	% Jj(1,1) = Ri'(1,1)+ Ri'(2,1);
+	% Jj(1,2) = Ri'(1,2)+ Ri'(2,2);
+	% Jj(1,3) = [1 1] * Ri' * [- g(2, 3); g(1, 3)];
+
+	Jj(1:2) = [1 1] * Ri';
+	Jj(3) = xj(1:2, 3)' * Ri' * [1; -1];
 
 	Ji=-Jj; 
 end
 
 %%
-function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, initial_odometry, kernel_threshold, damping)
+function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, initial_odometry, kernel_threshold_land, kernel_threshold_pose, damping)
 	global num_poses num_landmarks;
 
 	% size of the system
@@ -140,18 +183,18 @@ function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landm
 		xl = XL(:, landmark_id+1);
 
 		% pose-landmark constraint
-		[visible, e, Jr, Jl] = errorAndJacobian(xr, xl, z);
+		[visible, e, Jr, Jl] = errorAndJacobianLandmarkProjections(xr, xl, z);
 
 		if not(visible)
 			continue;
 		end
 
 		chi = e' * e;
-		if (chi>kernel_threshold)
-			e *= sqrt(kernel_threshold/chi);
-			chi = kernel_threshold;
-			% chi_tot += kernel_threshold;
-			% continue;
+		if (chi>kernel_threshold_land)
+			e *= sqrt(kernel_threshold_land/chi);
+			chi = kernel_threshold_land;
+			chi_tot += kernel_threshold_land;
+			continue;
 		else
 			num_inliers(1) += 1;
 		end
@@ -179,11 +222,9 @@ function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landm
 		[e, Ji, Jj] = poseErrorAndJacobian(xi, xj, z_ij);
 
 		chi = e' * e;
-		if (chi>kernel_threshold)
-			e *= sqrt(kernel_threshold/chi);
-			chi = kernel_threshold;
-			% chi_tot += kernel_threshold;
-			% continue;
+		if (chi>kernel_threshold_pose)
+			e *= sqrt(kernel_threshold_pose/chi);
+			chi = kernel_threshold_pose;
 		else
 			num_inliers(2) += 1;
 		end
@@ -204,7 +245,6 @@ function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landm
 
 	end
 
-	%H += eye(system_size) * damping;
 	dx = zeros(system_size, 1);
 
 	% dx = -H\b;
