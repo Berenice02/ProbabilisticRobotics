@@ -8,7 +8,7 @@ source "./geometry_helpers.m"
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% XR:  is a 3x3xnum_poses array of homogeneous transform matrices
 %% XL:  is a 3xnum_landmarks array of 3D positions
-%% dx:  num_poses x 3 + num_landmarks x 3 perturbation vector
+%% dx:  (num_poses x 3 + num_landmarks x 3) perturbation vector
 %%
 %% XR:  XR after applying the perturbation
 %% XL:  XL after applying the perturbation
@@ -93,7 +93,17 @@ function [visible, e, Jr, Jl] = errorAndJacobianLandmarkProjections(xr, xl, z)
 	Jl = J_proj * camera_infos.K * R_t;
 end
 
-function [e, Ji, Jj]=poseErrorAndJacobianAA(xi, xj, z)
+% get error and Jacobian using chordal distance
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% xi:  is a 3x3 transform matrix representing the first robot pose in world frame
+%% xj:  is a 3x3 transform matrix representing the second robot pose in world frame
+%% z:   is a 3x3 transform matrix representing the measured displacement of the two poses
+%%		it comes from the initial odometry poses
+%%
+%% e:   is a 6x1 array representing the error, aka the difference between prediction and measurement
+%% Ji:  is a 6x3 derivative of the error wrt a perturbation of the first pose
+%% Jj:  is a 6x3 derivative of the error wrt a perturbation of the second pose
+function [e, Ji, Jj]=poseErrorAndJacobianChordal(xi, xj, z)
 	e = zeros(6,1);
 	Ji = zeros(6,3);
 	Jj = zeros(6,3);
@@ -104,31 +114,28 @@ function [e, Ji, Jj]=poseErrorAndJacobianAA(xi, xj, z)
 	Ri=xi(1:2,1:2);
 	Rj=xj(1:2,1:2);
 
-	% Jj(5:6, 1) = Ri' * [1; 0];
-	% Jj(5:6, 2) = Ri' * [0; 1];
+	Jj(5:6, 1) = Ri' * [1; 0];
+	Jj(5:6, 2) = Ri' * [0; 1];
 
-	% Rz0=[0 -1;
-	%      1  0];
-	% Jtheta = Ri' * Rz0 * Rj;
-	% Jj(1:4, 3) = reshape(Jtheta, 4, 1);
-	% Jj(5:6, 3) = Ri' * Rz0 * xj(1:2, 3);
+	Rz0=[0 -1;
+	     1  0];
+	Jtheta = Ri' * Rz0 * Rj;
+	Jj(1:4, 3) = reshape(Jtheta, 4, 1);
+	Jj(5:6, 3) = Ri' * Rz0 * xj(1:2, 3);
 
-	x1 = zeros(3,3);
-	x1(1,3) = -1;
-	x2 = zeros(3,3);
-	x2(2,3) = -1;
-	x3 = zeros(3,3);
-	x3(1,2) = 1;
-	x3(2,1) = -1;
-
-	dx = flatten(inv(xi) * x1* xj);
-	dy = flatten(inv(xi) * x2* xj);
-	dt = flatten(inv(xi) * x3* xj);
-
-	Jj = [dx dy dt];
 	Ji=-Jj; 
 end
 
+% get error and Jacobian using euclidean norm of the displacement
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% xi:  is a 3x3 transform matrix representing the first robot pose in world frame
+%% xj:  is a 3x3 transform matrix representing the second robot pose in world frame
+%% z:   is a 3x3 transform matrix representing the measured displacement of the two poses
+%%		it comes from the initial odometry poses
+%%
+%% e:   is a scalar representing the error, aka the difference between prediction and measurement
+%% Ji:  is a 1x3 derivative of the error wrt a perturbation of the first pose
+%% Jj:  is a 1x3 derivative of the error wrt a perturbation of the second pose
 function [e, Ji, Jj]=poseErrorAndJacobian(xi, xj, z)
 	e = 0;
 	Ji = zeros(1,3);
@@ -142,28 +149,35 @@ function [e, Ji, Jj]=poseErrorAndJacobian(xi, xj, z)
 
 	Ri=xi(1:2,1:2);
 
-	% Jj(1, 1) = norm(Ri' * [1; 0]);
-	% Jj(1, 2) = norm(Ri' * [0; 1]);
-
-	% Jj(1, 1) = 1;
-	% Jj(1, 2) = 1;
-	% Jj(1, 3) = [1 1] * xj(1:2, 3);
-
-	% Jj(1,1) = g(1, 3);
-	% Jj(1,2) = g(2, 3);
-
-	% Jj(1,1) = Ri'(1,1)+ Ri'(2,1);
-	% Jj(1,2) = Ri'(1,2)+ Ri'(2,2);
-	% Jj(1,3) = [1 1] * Ri' * [- g(2, 3); g(1, 3)];
-
 	Jj(1:2) = [1 1] * Ri';
 	Jj(3) = xj(1:2, 3)' * Ri' * [1; -1];
 
 	Ji=-Jj; 
 end
 
+%% Implementation of the optimization loop with robust kernel
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% XR:  			the initial robot poses		
+%%					is a 3x3xnum_poses array of homogeneous transform matrices
+%% XL:  			the initial landmark positions
+%%					is a 3xnum_landmarks array of 3D positions
+%% observations:	the measurements for the pose-landmark constraint
+%%					is a 2 x num_measurements array
+%% landmark_associations:	it is a 2 x num_measurements array
+%%                        	each column contains the vector [ID of the pose; ID of the landmark]
+%% initial_odometry:		the measurements for the pose-pose constraint
+%%							is a 3x3xnum_poses-1 array of homogeneous transform matrices
+%% kernel_threshold_land:	robust kernel threshold for landmarks
+%% kernel_threshold_pose:	robust kernel threshold for poses
 %%
-function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, initial_odometry, kernel_threshold_land, kernel_threshold_pose, damping)
+%% XR:			the robot poses after optimization
+%% XL:			the landmark positions after optimization
+%% chi_tot:		a 2x1 vector containing chi2 for the two error functions
+%% num_inliers: a 2x1 vector containing the inliers for the two error functions
+%% H:			the H matrix
+%% b			the b vector
+
+function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, initial_odometry, kernel_threshold_land, kernel_threshold_pose)
 	global num_poses num_landmarks;
 
 	% size of the system
