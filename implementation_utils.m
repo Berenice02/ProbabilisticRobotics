@@ -177,7 +177,7 @@ end
 %% H:			the H matrix
 %% b			the b vector
 
-function [XR, XL, chi_tot, num_inliers, H, b] = doLS(XR, XL, observations, landmark_associations, initial_odometry, kernel_threshold_land, kernel_threshold_pose)
+function [XR, XL, chi_tot, num_inliers] = doLS(XR, XL, observations, landmark_associations, initial_odometry, kernel_threshold_land, kernel_threshold_pose)
 	global num_poses num_landmarks;
 
 	% size of the system
