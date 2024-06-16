@@ -207,7 +207,7 @@ function [XR, XL, chi_tot, num_inliers] = doLS(XR, XL, observations, landmark_as
 		if (chi>kernel_threshold_land)
 			e *= sqrt(kernel_threshold_land/chi);
 			chi = kernel_threshold_land;
-			chi_tot += kernel_threshold_land;
+			chi_tot(1) += kernel_threshold_land;
 			continue;
 		else
 			num_inliers(1) += 1;
@@ -256,7 +256,6 @@ function [XR, XL, chi_tot, num_inliers] = doLS(XR, XL, observations, landmark_as
 
 		b(pose_i_index:pose_i_index+2) += Ji'*e;
 		b(pose_j_index:pose_j_index+2) += Jj'*e;
-
 	end
 
 	dx = zeros(system_size, 1);
