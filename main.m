@@ -30,7 +30,6 @@ global camera_infos;
 XR = zeros(3, 3, num_poses);
 gt_poses = zeros(3, 3, num_poses);
 initial_odometry = zeros(3, 3, num_poses-1);
-XL = zeros(3, num_landmarks);
 
 % Initialization
 for i = 1:num_poses
@@ -44,16 +43,18 @@ for i = 1:num_poses
     initial_odometry(:, :, i-1) = inv(XR(:, :, i-1)) * XR(:, :, i);
 end
 
+XL = zeros(3, num_landmarks);
+gt_landmarks = world_landmarks(:,:)';
 initial_XL = get_initial_guess(traj(:, 1:3)', observations, landmark_associations);
 XL = initial_XL;
-gt_landmarks = world_landmarks(:,:)';
-
-% inside_distance_range = statistics_initial_guess(traj, world_landmarks, 10, observations, landmark_associations)
-% k = wrong_measurements(traj, world_landmarks, observations, landmark_associations);
 
 initial_RMSE = zeros(1, 3);
 initial_RMSE(1:2) = compute_RMSE_poses(XR, gt_poses);
 initial_RMSE(3) = compute_RMSE_landmarks(XL, gt_landmarks);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%  OPTIMIZATION LOOP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 iterations = 5;
 kernel_threshold_land = 1e4;
@@ -66,6 +67,10 @@ for k = 1:iterations
     chi_stats(:, k) = chi_tot;
     inliers_stats(:, k) = num_inliers;
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%  Save results
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 final_RMSE = zeros(1, 3);
 final_RMSE(1:2) = compute_RMSE_poses(XR, gt_poses);
@@ -94,7 +99,6 @@ for i = 1:iterations
     stats(i, 4:5) = inliers_stats(:, i)';
 end
 
-% Save results in files
 % POSE_ID (1) OPTIMIZED_POSE (2:4) GROUNDTRUTH_POSE (5:7)
 save('output/XR.dat', 'traj_opt');
 % LANDMARK_ID (1) OPTIMIZED_POSITION (2:4) GROUNDTRUTH_POSITION (5:7)
@@ -105,7 +109,10 @@ save('output/chi_and_inliers.dat', 'stats');
 save('output/initial_RMSE.dat', 'initial_RMSE');
 save('output/final_RMSE.dat', 'final_RMSE');
 
-% Plot graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%  PLOT RESULTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 plot_state(traj_opt(:, 2:4), traj(:, 1:3), traj(:, 4:6), XL, initial_XL, gt_landmarks)
 plot_statistics(chi_stats, inliers_stats)
 %plot_RMSE(rmse_stats)
