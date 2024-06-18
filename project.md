@@ -24,7 +24,7 @@ The computation starts from the normalized coordinates $s_1=[\text{col}_1 \quad 
 Both intrinsic and extrinsic parameters of all the cameras are known.
 Indeed, the transformation matrix from the world frame to the camera frame associated with the robot pose $n$ can be computed as:
 
-$O_n = \widetilde{K} \cdot \left ( \text{robot\_pose}_n \cdot \text{camera\_robot\_pose} \right )^{-1}$
+$O_n = \widetilde{K} \cdot \left ( \text{robot-pose}_n \cdot \text{camera-robot-pose} \right )^{-1}$
 
 The parametric equation, expressed in the world frame, of the visual ray passing through $O_n$ and the point of coordinates $s_m$ is:
 
@@ -33,17 +33,17 @@ where $o_n$ and $R_n = [r_1 \quad r_2 \quad r_3]$ are, respectively, the transit
 
 Therefore, we obtain the following system:
 
-$$
+```math
 \begin{bmatrix}
-r_1^T - \text{col}_m \cdot r_3^T\\ 
+r_1^T - \text{col}_m \cdot r_3^T\\\ 
 r_2^T - \text{row}_m \cdot r_3^T
 \end{bmatrix}
 p = 
 \begin{bmatrix}
-o_x - o_z \cdot \text{col}_m\\ 
+o_x - o_z \cdot \text{col}_m\\\ 
 o_y - o_z \cdot \text{row}_m
 \end{bmatrix}
-$$
+```
 $A_m \cdot p = b_m\quad$ with $A$ is a 2x3 matrix and $b$ is a 2x1 vector.
 
 by:
@@ -131,16 +131,17 @@ $$
 
 where, $R_t$ is the rotational part of the matrix $\left ( x_r^{[n]} \cdot T_{\text{cam}} \right )^{-1}$;
 
-$$
+```math
 J_{\text{proj}} =
 \begin{bmatrix}
 1/z & 0  & -x/z^2 \\ 
 0 & 1/z & -y/z^2
 \end{bmatrix}
-\quad $$
+\quad
+```
 where $x, y$ and $z$ are the coordinates of the landmark expressed in camera frame.
 
-$$
+```math
 J_{\text{icp}} = 
 \begin{bmatrix}
 -R_t \cdot \begin{bmatrix}
@@ -149,13 +150,14 @@ J_{\text{icp}} =
 0 & 0 & 0
 \end{bmatrix}
 \end{bmatrix}
-\quad $$
+\quad
+```
 where $x$ and $y$ are the coordinates of the landmark expressed in world frame.
 
 Lastly, the dimensions are:
 
 $$
-J_r^{[n,m]} \in 2 \times 3 \\J_l^{[n,m]} \in 2 \times 3 \\J^{[n,m]} \in 2 \times (3 \cdot N + 3 \cdot M)
+J_r^{[n,m]} \in 2 \times 3 \qquad J_l^{[n,m]} \in 2 \times 3 \qquad J^{[n,m]} \in 2 \times (3 \cdot N + 3 \cdot M)
 $$
 
 ## Pose-Pose constraint
@@ -191,14 +193,15 @@ The Jacobian is computed by noting, as pointed out also in the slides, that give
 $g^{[i, j]}(X) = X_r^{[i]-1}X_r^{[j]}$
 we have:
 
-$$
+```math
 \left. \frac{\partial g\left ( X_i \boxplus \Delta x_i, X_j \boxplus \Delta x_j \right )}{\partial \Delta x_i} \right|_{\Delta x = 0} = - \left. \frac{\partial g\left ( X_i \boxplus \Delta x_i, X_j \boxplus \Delta x_j \right )}{\partial \Delta x_j} \right|_{\Delta x = 0}
-$$
+```
 
 Therefore we can focus on computing the derivative with respect to $\Delta x_j$, being the derivative with respect to $\Delta x_i$ only its opposite.
 
 We have:
 
+```math
 \begin{align*}
 g(X_i, X_j \boxplus \Delta x_j) &= X_i^{-1} v2t(\Delta x_j) X_j \\
 &=
@@ -220,9 +223,11 @@ g(X_i, X_j \boxplus \Delta x_j) &= X_i^{-1} v2t(\Delta x_j) X_j \\
  0 & 1
 \end{bmatrix}
 \end{align*}
+```
 
 The norm of the translational part is computed by simply squaring and then taking the square root of the sum of the two components of the array, thus the derivatives are the following:
 
+```math
 \begin{align*}
 \left. \frac{\partial h\left ( X_i, X_j \boxplus \Delta x_j \right )}{\partial \Delta t_j} \right|_{\Delta x = 0} &= 
 \begin{bmatrix}
@@ -236,6 +241,7 @@ The norm of the translational part is computed by simply squaring and then takin
  \left ( \cos(\theta_i) - \sin(\theta_i) \right ) y_j
 \end{bmatrix}
 \end{align*}
+```
 
 The jacobian with respect to $\Delta x_i$ is the opposite.
 
