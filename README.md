@@ -2,13 +2,13 @@
 
 The aim of this project is to develop a SLAM system, i.e. to estimate both the trajectory of a robot and the position of a set of 3D points in the environment (landmarks).
 A good estimate minimizes the error with respect to the given ground truth.
-Thus, this repo contains the code of such SLAM system, some result images and error values, as a way to evaluate the quality of the system.
+Thus, this repo contains the code of such SLAM system, together with some result images and error values, as a way to evaluate the quality of the system.
 
 In particular, the robot is a Differential Drive robot, equipped with a monocular camera (with known extrinsics and intrinsics parameters) through which the robot, while moving on a plane, senses a set of 3D landmarks, each identified by a unique "id".
-For each pose, a stream of point projections (of the landmarks on the image plane) with corresponding “id” are given.
+For each pose, a stream of point projections (of the landmarks on the image plane) with corresponding “id”s are given.
 
 The initial guess of the trajectory is provided as wheeled odometry, while [the next section](#initial-guess) describes how an initial guess for the position of the landmarks has been obtained.
-Then, the approach chosen to improve such initial guess is a total least squares method, with pose-landmark constraints given by the point projections and pose-pose constraints given by the norm of the translation error.
+Then, the approach chosen to improve such initial guess is a total least squares method, with pose-landmark constraints given by the point projections and pose-pose constraints given by the norm of the translation errors.
 
 The project has been developed in OCTAVE and accurately reconstruct the whole ground truth trajectory and some of the landmark positions.
 Other landmarks has been initialized too far from their ground truth position for the system to retreive the right one, while others were not visible in the measurements.
@@ -44,14 +44,14 @@ o_x - o_z \cdot \text{col}_m\\\
 o_y - o_z \cdot \text{row}_m
 \end{bmatrix}
 ```
-$A_m \cdot p = b_m\quad$ with $A$ is a 2x3 matrix and $b$ is a 2x1 vector.
+$A_m \cdot p = b_m\quad$ with $A$ a 2x3 matrix and $b$ a 2x1 vector.
 
-by:
+The mathematical manipulations performed to obtain the system were:
 - premultiplying both sides by $R_n^T$
 - setting $R_n^T \cdot o_n = [o_x \quad o_y \quad o_z]^T$
 - computing $\lambda_m$ in the third equation and replacing its value into the other two equations
 
-I computed $A_m$ and $b_m$ for each measurement of each landmark and then stacked together for each landmark in the form $A = [A_1 \cdots A_M]^T$ and $b = [b_1 \cdots b_M]^T$.
+I computed $A_m$ and $b_m$ for each measurement of each landmark and then stacked them together for each landmark in the form $A = [A_1 \cdots A_M]^T$ and $b = [b_1 \cdots b_M]^T$
 
 In the ideal case, all visual rays intersect at point $P$ and thus, of all these equation, only 3 are independent.
 However, in practical applications like ours, because of noise, these equations are all independent and the system has no solution; hence, I computed the (approximated) least-squares solution.
@@ -105,7 +105,7 @@ $$
 h^{[n,m]} = \text{proj} \left(K \cdot \left ( X_r^{[n]} \cdot T_{\text{cam}} \right )^{-1} \cdot X_l^{[m]} \right )
 $$
 
-Moreover, to have a valid prediction, the point has to be inside the viewing frustum, thus additional checks are performed.
+Moreover, to have a valid prediction, the point has to be inside the viewing frustum of the camera, thus additional checks are performed.
 
 #### Error
 
@@ -116,7 +116,7 @@ $e^{[n,m]}(X) =  h^{[n,m]}-z^{[n,m]}$
 
 #### Jacobian
 
-Since the prediction depends only on the robot pose $n$ and the landmark $m$, the entries of the Jacobian will be mostly 0.
+Since the prediction depends only on the robot pose $n$ and on the landmark $m$, the entries of the Jacobian will be mostly 0.
 It will be non 0 for the pose block $n$, i.e. $J_r^{[n,m]}$ and for the landmark block $m$, i.e. $J_l^{[n,m]}$.
 
 As usual, we can expand those blocks:
@@ -143,12 +143,10 @@ where $x, y$ and $z$ are the coordinates of the landmark expressed in camera fra
 
 ```math
 J_{\text{icp}} = 
-\begin{bmatrix}
--R_t \cdot \begin{bmatrix}
+R_t \cdot \begin{bmatrix}
 -1 & 0 & y \\ 
 0 & -1 & -x \\ 
 0 & 0 & 0
-\end{bmatrix}
 \end{bmatrix}
 \quad
 ```
@@ -168,22 +166,21 @@ The first is the Chordal Distance, as discussed in the slides of the course.
 The error in this case is a $6 \times 1$ vector containing the differences between each element (4 rotational and 2 translational ones) of the two relative motions (estimated and measured).
 The Jacobian is computed consequently.
 
-The second method is the chosen one, i.e. the one that produce the results in the graphs.
+The second method is the chosen one, i.e. the one that produces the results in the figures.
 It is described in the following.
 
 ### Measurements
 We don't have direct measurements that relates subsequent poses.
-However, we can retrieve them by using the (noisy) odometry.
+However, we can easily retrieve them by using the (noisy) odometry.
 Indeed, the relative motion between two subsequent poses $T_0, T_1$ can be measured as:
-$rel_T = T_0^{-1} \cdot T_1$
-
+$rel_T = T_0^{-1} \cdot T_1$.
 Therefore, the measurements for adding a pose-pose constraint were retrieved by computing the relative motion from the odometry poses.
 
 Then, I choose to use only the translational part of this relative motion, in particular computing the norm (magnitude) of the translation vector.
 In other word, I considered the (scalar) euclidean distance of the displacement as measurement.
 
 #### Predictions
-The prediction is computed by computing the relative motion and then the norm of its translational part.
+The prediction is computed by computing the relative motion between subsequent poses and then the norm of its translational part.
 
 #### Error
 The error in this case is a scalar containing the difference between the two computed norms (estimated and measured).
@@ -247,7 +244,7 @@ The jacobian with respect to $\Delta x_i$ is the opposite.
 
 ## Results and evaluation
 #### Trajectory
-The following image show the odometry trajectory and the optimized one, each compared to the ground truth.
+The following image shows the odometry trajectory and the optimized one, each compared to the ground truth.
 As it is visible, the optimized trajectory completely overlaps with the ground truth, and this is confirmed also by the RMSE error for the poses, whose values are showed in the table below.
 
 | RMSE | Initial | Final |
@@ -257,8 +254,8 @@ As it is visible, the optimized trajectory completely overlaps with the ground t
 
 ![trajectory](./output/trajectories.jpg)
 
-It is possible to obtain this results by using both pose-pose and pose-landmark contraints.
-Indeed, the following image shows the results by using only the pose-landmark constraint.
+It is possible to obtain these results by using both pose-pose and pose-landmark contraints.
+Indeed, the following image shows the trajectory obtained by using only the pose-landmark constraint.
 
 ![pose-land](./output/trajectories_wo_pose-pose.jpg)
 
@@ -271,7 +268,7 @@ Moreover the second row shows a close up on the significant regions of the space
 ![landmarks](./output/landmarks.jpg)
 
 From this image it is visible that most of the landmarks covers their ground truth positions.
-However, there are a large number of outlies due both to a poor initialization and to the fact that not all landmarks are present in the measurements.
+However, there is a certain amount of outliers due both to a poor initialization and to the fact that not all landmarks are present in the measurements.
 Indeed, as explained in [the initial guess section](#initial-guess), it was possible to initialize the position of only 838 landmarks out of 1000.
 This explains also the high RMSE value obtained at the end, and shown in the following table.
 
@@ -279,12 +276,13 @@ This explains also the high RMSE value obtained at the end, and shown in the fol
 |------|---------|-------|
 | translation | 2240.402 | 1500.318 |
 
-Finally, the image below shows the evolution of chi error and numbers of inliers for both constraints.
+Finally, the image below shows the evolution of chi error and number of inliers for both constraints.
 
 ![stats](./output/stats.jpg)
 
 As expected, at the end of the optimization, the landmark error is still high and the number of inlier measurements are 19212 out of 19631.
-On the other hand, the poses error was 0 since the measurements and the initial guess refer to the same data (odometry).
+
+On the other hand, at start the poses error was 0 since the measurements and the initial guess refer to the same data (odometry).
 However, at the end of the optimization, the error returns small and the number of inliers continued to be the totality of measurements.
 
 # References
