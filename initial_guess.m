@@ -10,7 +10,9 @@ source "./camera_utils.m"
 %%                        num_measurements is AT MOST num_poses * num_landmarks
 %% landmark_associations: it is a 2 x num_measurements array
 %%                        each column contains the vector [ID of the pose; ID of the landmark]
-%% mode:                  it is a string that represent the type of weight used to
+%% mode:                  NOT USED. IT WAS JUST A TRY TO MAKE INITIALIZATION BETTER
+%%                        BUT IT DIDN'T WORKED CORRECTLY
+%%                        it is a string that represent the type of weight used to
 %%                        compensate for the cumulative error of the pose
 %%                        possible values are: ['no_weight', 'linear', 'hyperbola', 'log']
 %%
@@ -36,7 +38,6 @@ function landmarks = get_initial_guess(robot_poses, observations, landmark_assoc
             robot_pose = v2t((robot_poses(:, pose_id+1))');
             z = ob(:, j);
             [A, b] = get_triangulation_equations(robot_pose, z);
-            % [A, b] = get_triangulation_equations_alternative(robot_pose, z);
 
             start_index = j*2-1;
             As(start_index:start_index+1, :) = A(:, :);
@@ -44,7 +45,6 @@ function landmarks = get_initial_guess(robot_poses, observations, landmark_assoc
         end
 
         point = solve_system(As, bs, Ws, mode=mode);
-        % point = solve_system_alternatives(As, bs, Ws, mode=mode);
         landmarks(:, i) = point(1:3);
     end
 end
@@ -54,7 +54,9 @@ end
 %% As:          num_measurements*2 x 3 array containing triangulation matrices of each measurement
 %% bs:          num_measurements*2 x 1 array containing triangulation vectors of each measurement
 %% Ws:          num_measurements x 1 array containing pose_id of each measurement
-%% mode:        it is a string that represent the type of weight used to
+%% mode:        NOT USED. IT WAS JUST A TRY TO MAKE INITIALIZATION BETTER
+%%              BUT IT DIDN'T WORKED CORRECTLY
+%%              it is a string that represent the type of weight used to
 %%              compensate for the cumulative error of the pose
 %%              possible values are: ['no_weight', 'linear', 'hyperbola', 'log']
 %%
@@ -80,23 +82,6 @@ function point = solve_system(As, bs, Ws, mode=mode)
     % point = -As\(bs);
 end
 
-function point = solve_system_alternatives(As, bs, Ws, mode=mode)
-    global num_poses;
-
-    [U, S, V] = svd(As, 'econ');
-    % bb = U'*bs;
-    % y = bb;
-    % for i=1:size(D,2)
-    %     y /= D(i,i);
-    % end
-    
-    % point = V * y;
-    
-    point = V(:, end);
-    % point = -As\(bs);
-end
-
-
 % It derives the A matrix and b vector to find the 3D position of a point
 % given one of its normalized image coordinates
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -114,19 +99,4 @@ function [A, b] = get_triangulation_equations(robot_pose, p_img)
 
     b = [w2i(1, 4) - w2i(3, 4) * p_img(1);
          w2i(2, 4) - w2i(3, 4) * p_img(2)];
-end
-
-function [A, b] = get_triangulation_equations_alternative(robot_pose, p_img)
-    global camera_infos;
-    w2i = world_to_image(robot_pose);
-
-    r1 = w2i(1, :);
-    r2 = w2i(2, :);
-    r3 = w2i(3, :);
-
-
-    A = [p_img(1) * r3 - r1;
-         p_img(2) * r3 - r2];
-
-    b = zeros(2,1);
 end
